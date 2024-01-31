@@ -36,6 +36,7 @@ class Player(pygame.sprite.Sprite):
         self.status = 'idle'
         self.facing_right = True
         self.on_ground = False
+        self.on_platform = None
         self.on_ceiling = False
         self.on_left = False
         self.on_right = False
@@ -154,10 +155,13 @@ class Player(pygame.sprite.Sprite):
         self.direction.x = -1
         self.facing_right = False
 
-    def get_damage(self):
+    def heal(self):
+        self.change_health(10)
+
+    def get_damage(self, damage):
         if not self.invincible:
             self.hit_sound.play()
-            self.change_health(-10)
+            self.change_health(damage)
             self.invincible = True
             self.hurt_time = pygame.time.get_ticks()
 
@@ -181,3 +185,10 @@ class Player(pygame.sprite.Sprite):
         self.run_dust_animation()
         self.invincibility_timer()
         self.wave_value()
+
+        if self.on_platform:
+            if self.on_platform.move_type == 'horizontal':
+                self.collision_rect.x += self.on_platform.speed
+            else:
+                self.collision_rect.y += self.on_platform.speed
+

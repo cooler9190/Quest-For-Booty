@@ -3,10 +3,14 @@ from tiles import StaticTile
 
 
 class MovingPlatform(StaticTile):
-    def __init__(self, size, x, y, move_type):
-        super().__init__(size, x, y, pygame.image.load('../graphics/terrain/horizontal_platform.png').convert_alpha())
-        offset_x = x + 2 * size
-        self.rect = self.image.get_rect(topleft=(offset_x, y))
+    def __init__(self, size, x, y, path, move_type):
+        super().__init__(size, x, y, pygame.image.load(path).convert_alpha())
+        if path == '../graphics/terrain/moving_platforms/horizontal_platform.png':
+            offset_x = x + 2 * size
+            self.rect = self.image.get_rect(topleft=(offset_x, y))
+        elif path == '../graphics/terrain/moving_platforms/vertical_platform.png':
+            offset_y = y - 2 * size
+            self.rect = self.image.get_rect(topleft=(x, offset_y))
         self.speed = 2
         self.move_type = move_type
 
@@ -19,9 +23,8 @@ class MovingPlatform(StaticTile):
     def reverse(self):
         self.speed *= -1
 
-    def update(self, x_shift, y_shift):
+    def update(self, x_shift, surface=None):
         self.rect.x += x_shift
-        self.rect.y += y_shift
         if self.move_type == 'horizontal':
             self.move_horizontal()
         else:

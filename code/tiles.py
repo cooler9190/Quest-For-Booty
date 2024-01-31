@@ -8,9 +8,8 @@ class Tile(pygame.sprite.Sprite):
         self.image = pygame.Surface((size, size))
         self.rect = self.image.get_rect(topleft=(x, y))
 
-    def update(self, x_shift, y_shift):
+    def update(self, x_shift, surface=None):
         self.rect.x += x_shift
-        self.rect.y += y_shift
 
 
 class StaticTile(Tile):
@@ -26,6 +25,23 @@ class Crate(StaticTile):
         self.rect = self.image.get_rect(bottomleft=(x, offset_y))
 
 
+class RumBottle(StaticTile):
+    def __init__(self, size, x, y):
+        super().__init__(size, x, y, pygame.image.load('../graphics/terrain/rum_bottle.png').convert_alpha())
+        offset_y = y + size
+        self.rect = self.image.get_rect(bottomleft=(x, offset_y))
+
+
+class Spikes(StaticTile):
+    def __init__(self, size, x, y):
+        super().__init__(size, x, y, pygame.image.load('../graphics/enemy/spikes/spikes.png').convert_alpha())
+
+
+class Treasure(StaticTile):
+    def __init__(self, size, x, y):
+        super().__init__(size, x, y, pygame.image.load('../graphics/character/chest.png').convert_alpha())
+
+
 class AnimatedTile(Tile):
     def __init__(self, size, x, y, path):
         super().__init__(size, x, y)
@@ -39,10 +55,9 @@ class AnimatedTile(Tile):
             self.frame_index = 0
         self.image = self.frames[int(self.frame_index)]
 
-    def update(self, x_shift, y_shift):
+    def update(self, x_shift, surface=None):
         self.animate()
         self.rect.x += x_shift
-        self.rect.y += y_shift
 
 
 class Coin(AnimatedTile):

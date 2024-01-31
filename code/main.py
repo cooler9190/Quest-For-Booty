@@ -8,7 +8,7 @@ from ui import UI
 class Game:
     def __init__(self):
         # game attributes
-        self.max_level = 1
+        self.max_level = 5
         self.max_health = 100
         self.current_health = 100
         self.coin_amount = 0
@@ -34,6 +34,9 @@ class Game:
         self.level_bg_music.play(loops=-1)
 
     def create_overworld(self, current_level, new_max_level):
+        if new_max_level == 6:
+            pygame.quit()
+            sys.exit()
         if new_max_level > self.max_level:
             self.max_level = new_max_level
         self.overworld = Overworld(current_level, self.max_level, screen, self.create_level)
@@ -45,7 +48,8 @@ class Game:
         self.coin_amount += amount
 
     def change_health(self, amount):
-        self.current_health += amount
+        if self.current_health != self.max_health or amount < 0:
+            self.current_health += amount
 
     def check_game_over(self):
         if self.current_health <= 0:
@@ -80,7 +84,6 @@ while True:
             pygame.quit()
             sys.exit()
 
-    screen.fill('grey')
     game.run()
 
     pygame.display.update()

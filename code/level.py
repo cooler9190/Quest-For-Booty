@@ -1,8 +1,10 @@
 import pygame
 from support import import_csv_layout, import_cut_graphics
 from settings import tile_size, screen_height, screen_width
-from tiles import Tile, StaticTile, Crate, Coin, Palm
+from tiles import Tile, StaticTile, Crate, Coin, Palm, Spikes, RumBottle, Treasure
 from enemy import Enemy
+from shell_enemy import Shell
+from boss import Boss
 from moving_platform import MovingPlatform
 from decoration import Sky, Water, Clouds
 from player import Player
@@ -15,7 +17,6 @@ class Level:
         # general setup
         self.display_surface = surface
         self.world_shift_x = 0
-        self.world_shift_y = 0
 
         # audio
         self.coin_sound = pygame.mixer.Sound('../audio/effects/coin.wav')
@@ -61,6 +62,10 @@ class Level:
         crate_layout = import_csv_layout(level_data['crates'])
         self.crate_sprites = self.create_tile_group(crate_layout, 'crates')
 
+        # health setup
+        health_layout = import_csv_layout(level_data['health'])
+        self.health_sprites = self.create_tile_group(health_layout, 'health')
+
         # coins setup
         coins_layout = import_csv_layout(level_data['coins'])
         self.coin_sprites = self.create_tile_group(coins_layout, 'coins')
@@ -73,9 +78,26 @@ class Level:
         bg_palms_layout = import_csv_layout(level_data['bg_palms'])
         self.bg_palm_sprites = self.create_tile_group(bg_palms_layout, 'bg_palms')
 
+        # spikes setup
+        spikes_layout = import_csv_layout(level_data['spikes'])
+        self.spike_sprites = self.create_tile_group(spikes_layout, 'spikes')
+
         # enemy setup
         enemy_layout = import_csv_layout(level_data['enemies'])
         self.enemy_sprites = self.create_tile_group(enemy_layout, 'enemies')
+
+        # shell setup
+        shell_layout = import_csv_layout(level_data['shell'])
+        self.shell_sprites = self.create_tile_group(shell_layout, 'shell')
+        self.pearl_sprite = pygame.sprite.Group()
+
+        # boss setup
+        boss_layout = import_csv_layout(level_data['boss'])
+        self.boss_sprite = self.create_tile_group(boss_layout, 'boss')
+
+        # treasure setup
+        treasure_layout = import_csv_layout(level_data['treasure'])
+        self.treasure_sprite = self.create_tile_group(treasure_layout, 'treasure')
 
         # enemy constraint setup
         constraints_layout = import_csv_layout(level_data['constraints'])
@@ -102,7 +124,18 @@ class Level:
                         sprite = StaticTile(tile_size, x, y, tile_surface)
 
                     elif type == 'moving platform':
-                        sprite = MovingPlatform(tile_size, x, y, 'horizontal')
+                        if val == '0':
+                            sprite = MovingPlatform(tile_size, x, y, '../graphics/terrain/moving_platforms/horizontal_platform.png',
+                                                    'horizontal')
+                        elif val == '1':
+                            sprite = MovingPlatform(tile_size, x, y, '../graphics/terrain/moving_platforms/small_island_horiz.png',
+                                                    'horizontal')
+                        elif val == '2':
+                            sprite = MovingPlatform(tile_size, x, y, '../graphics/terrain/moving_platforms/small_island_vert.png',
+                                                    'vertical')
+                        else:
+                            sprite = MovingPlatform(tile_size, x, y, '../graphics/terrain/moving_platforms/vertical_platform.png',
+                                                    'vertical')
 
                     elif type == 'grass':
                         grass_tile_list = import_cut_graphics('../graphics/decoration/grass/grass.png')
@@ -111,6 +144,9 @@ class Level:
 
                     elif type == 'crates':
                         sprite = Crate(tile_size, x, y)
+
+                    elif type == 'health':
+                        sprite = RumBottle(tile_size, x, y)
 
                     elif type == 'coins':
                         if val == '0':
@@ -127,8 +163,23 @@ class Level:
                     elif type == 'bg_palms':
                         sprite = Palm(tile_size, x, y, '../graphics/terrain/palm_bg', 64)
 
-                    elif type == "enemies":
+                    elif type == 'spikes':
+                        sprite = Spikes(tile_size, x, y)
+
+                    elif type == 'treasure':
+                        sprite = Treasure(tile_size, x, y)
+
+                    elif type == 'enemies':
                         sprite = Enemy(tile_size, x, y,)
+
+                    elif type == 'shell':
+                        if val == '0':
+                            sprite = Shell(tile_size, x, y, 'left')
+                        elif val == '1':
+                            sprite = Shell(tile_size, x, y, 'right')
+
+                    elif type == 'boss':
+                        sprite = Boss(tile_size * 3, x, y)
 
                     elif type == 'constraints':
                         sprite = Tile(tile_size, x, y)
@@ -182,7 +233,8 @@ class Level:
     def horizontal_movement_collision(self):
         player = self.player.sprite
         player.collision_rect.x += player.direction.x * player.speed
-        collidable_sprites = self.terrain_sprites.sprites() + self.crate_sprites.sprites() + self.moving_platform_sprites.sprites()
+        collidable_sprites = (self.terrain_sprites.sprites() + self.crate_sprites.sprites() +
+                              self.moving_platform_sprites.sprites() + self.shell_sprites.sprites())
 
         for sprite in collidable_sprites:
             # We use colliderect instead of sprite collision because we want to have access to each of the tile's rect
@@ -200,10 +252,13 @@ class Level:
     def vertical_movement_collision(self):
         player = self.player.sprite
         player.apply_gravity()
-        collidable_sprites = self.terrain_sprites.sprites() + self.crate_sprites.sprites() + self.moving_platform_sprites.sprites()
+        collidable_sprites = (self.terrain_sprites.sprites() + self.crate_sprites.sprites() +
+                              self.moving_platform_sprites.sprites() + self.shell_sprites.sprites())
 
         for sprite in collidable_sprites:
             if sprite.rect.colliderect(player.collision_rect):
+                if isinstance(sprite, MovingPlatform):
+                    player.on_platform = sprite
                 if player.direction.y > 0:
                     player.collision_rect.bottom = sprite.rect.top
                     # Once we hit a tile we reset the gravity to 0, so that it doesn't build up and destroy the player
@@ -218,41 +273,23 @@ class Level:
 
             if player.on_ground and player.direction.y < 0 or player.direction.y > 1:
                 player.on_ground = False
+                player.on_platform = None
 
     def scroll_x(self):
         player = self.player.sprite
         player_x = player.rect.centerx
         direction_x = player.direction.x
-
-        if player_x < screen_width / 3 and direction_x < 0:
+        if player_x < screen_width / 2.7 and direction_x < 0:
             self.world_shift_x = 8
-            #self.world_shift_y = 0
             player.speed = 0
-        elif player_x > screen_width - (screen_width / 3) and direction_x > 0:
+        elif player_x > screen_width - (screen_width / 2.7) and direction_x > 0:
             self.world_shift_x = -8
-            #self.world_shift_y = 0
             player.speed = 0
         else:
             self.world_shift_x = 0
-            #self.world_shift_y = 0
             player.speed = 8
 
-    def scroll_y(self):
-        player = self.player.sprite
-        player_y = player.rect.centery
-        direction_y = player.direction.y
-
-        if player_y < screen_height / 4 and direction_y < 0:
-            self.world_shift_y = 10
-            player.jump_speed = 0
-        elif player_y > screen_height - (screen_height / 3) and direction_y > 0:
-            self.world_shift_y = -17
-        else:
-            self.world_shift_y = 0
-            player.jump_speed = -16
-
     def world_shift(self):
-        #self.scroll_y()
         self.scroll_x()
 
     def is_payer_on_ground(self):
@@ -278,25 +315,83 @@ class Level:
         if pygame.sprite.spritecollide(self.player.sprite, self.goal, False):
             self.create_overworld(self.current_level, self.new_max_level)
 
-    def check_platform_collision(self):
-        #collided_platforms = pygame.sprite.spritecollide(self.player.sprite, self.moving_platform_sprites, False)
-
-        for platform in self.moving_platform_sprites:
-            if platform.rect.colliderect(self.player.sprite.collision_rect):
-                self.player.sprite.rect.centerx += platform.speed
+    def check_bottle_collisions(self):
+        for bottle in self.health_sprites:
+            if bottle.rect.colliderect(self.player.sprite.collision_rect):
+                bottle.kill()
+                self.player.sprite.heal()
+                self.coin_sound.play()
 
     def check_coin_collisions(self):
-        collided_coins = pygame.sprite.spritecollide(self.player.sprite, self.coin_sprites, True)
-        if collided_coins:
-            for coin in collided_coins:
+        for coin in self.coin_sprites:
+            if coin.rect.colliderect(self.player.sprite.collision_rect):
+                coin.kill()
                 self.change_coins(coin.value)
                 self.coin_sound.play()
+
+    def check_for_shell_sight(self):
+        for shell in self.shell_sprites:
+            if shell.direction == 'left':
+                sight_range_start = shell.rect.x - 7 * tile_size
+                sight_range_end = shell.rect.x
+            else:
+                sight_range_start = shell.rect.x
+                sight_range_end = shell.rect.x + 7 * tile_size
+
+            if sight_range_start <= self.player.sprite.collision_rect.x <= sight_range_end\
+                    and self.player.sprite.collision_rect.y == (shell.rect.y - 10):
+                shell.shoot()
+                self.pearl_sprite.add(shell.pearl)
+            else:
+                shell.frames = shell.idle_frames
+
+    def check_boss_sight(self):
+        player = self.player.sprite
+        boss_sprites = self.boss_sprite.sprites()
+
+        if boss_sprites:
+            boss = boss_sprites[0]
+            left_sight_range = boss.rect.x - (15 * tile_size)
+            right_sight_range = boss.rect.x + (15 * tile_size)
+
+            if left_sight_range <= player.rect.x <= boss.rect.x and boss.is_target_in_height_range(player.rect.y):
+                boss.move_left()
+            elif right_sight_range >= player.rect.x >= boss.rect.x and boss.is_target_in_height_range(player.rect.y):
+                boss.move_right()
+            else:
+                boss.stop()
+
+    def check_pearl_collision(self):
+        for pearl in self.pearl_sprite:
+            if pearl.rect.colliderect(self.player.sprite.collision_rect):
+                pearl.has_hit = True
+                self.player.sprite.get_damage(-10)
+
+    def check_spike_collision(self):
+        boss_sprites = self.boss_sprite.sprites()
+        for spikes in self.spike_sprites:
+            if spikes.rect.colliderect(self.player.sprite.collision_rect):
+                self.player.sprite.get_damage(-10)
+                self.player.sprite.direction.y = - 15
+            elif boss_sprites:
+                boss = boss_sprites[0]
+                if spikes.rect.colliderect(boss.rect):
+                    boss.take_damage()
+                    if not boss.is_alive():
+                        explosion_sprite = ParticleEffect(boss.rect.center, 'explosion')
+                        self.explosion_sprites.add(explosion_sprite)
+                        self.stomp_sound.play()
+                        boss.kill()
+                        self.change_coins(500)
+
+
 
     def check_enemy_collisions(self):
         # to achieve this we will check if the bottom of the player is in the top half of the enemy
         # and the player is going down, we know we are destroying the enemy
         # but if player has collided in any different way, he will take damage
         enemy_collisions = pygame.sprite.spritecollide(self.player.sprite, self.enemy_sprites, False)
+        boss_collision = pygame.sprite.spritecollide(self.player.sprite, self.boss_sprite, False)
 
         if enemy_collisions:
             for enemy in enemy_collisions:
@@ -311,54 +406,78 @@ class Level:
                     self.stomp_sound.play()
                     enemy.kill()
                 else:
-                    self.player.sprite.get_damage()
+                    self.player.sprite.get_damage(-10)
+
+        elif boss_collision:
+            self.player.sprite.get_damage(-34)
+            self.player.sprite.direction.y = -15
 
     def run(self):
         # run the entire game/level
 
         # sky
         self.sky.draw(self.display_surface)
-        self.clouds.draw(self.display_surface, self.world_shift_x, self.world_shift_y)
+        self.clouds.draw(self.display_surface, self.world_shift_x)
 
         # bg palms
-        self.bg_palm_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.bg_palm_sprites.update(self.world_shift_x)
         self.bg_palm_sprites.draw(self.display_surface)
 
         # dust particles
-        self.dust_sprite.update(self.world_shift_x, self.world_shift_y)
+        self.dust_sprite.update(self.world_shift_x)
         self.dust_sprite.draw(self.display_surface)
 
         # terrain
-        self.terrain_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.terrain_sprites.update(self.world_shift_x)
         self.terrain_sprites.draw(self.display_surface)
 
         # constraints
-        self.constraint_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.constraint_sprites.update(self.world_shift_x)
 
         # moving platform
-        self.moving_platform_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.moving_platform_sprites.update(self.world_shift_x)
         self.platform_collision_reverse()
         self.moving_platform_sprites.draw(self.display_surface)
 
         # enemies
-        self.enemy_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.enemy_sprites.update(self.world_shift_x)
         self.enemy_collision_reverse()
         self.enemy_sprites.draw(self.display_surface)
-        self.explosion_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.explosion_sprites.update(self.world_shift_x)
         self.explosion_sprites.draw(self.display_surface)
 
+        # shells
+        self.shell_sprites.update(self.world_shift_x)
+        self.shell_sprites.draw(self.display_surface)
+
+        # pearl
+        self.pearl_sprite.update(self.world_shift_x, surface=self.display_surface)
+        self.pearl_sprite.draw(self.display_surface)
+
+        #boss
+        self.boss_sprite.update(self.world_shift_x)
+        self.boss_sprite.draw(self.display_surface)
+
+        # spikes
+        self.spike_sprites.update(self.world_shift_x)
+        self.check_spike_collision()
+        self.spike_sprites.draw(self.display_surface)
+
         # crates
-        self.crate_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.crate_sprites.update(self.world_shift_x)
         self.crate_sprites.draw(self.display_surface)
 
+        # health
+        self.health_sprites.update(self.world_shift_x)
+        self.health_sprites.draw(self.display_surface)
+
         # grass
-        self.grass_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.grass_sprites.update(self.world_shift_x)
         self.grass_sprites.draw(self.display_surface)
 
         # player sprites
         self.world_shift()
         self.player.update()
-        self.check_platform_collision()
         self.horizontal_movement_collision()
         self.is_payer_on_ground()
         self.vertical_movement_collision()
@@ -366,22 +485,30 @@ class Level:
         self.player.draw(self.display_surface)
 
         # fg palms
-        self.fg_palm_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.fg_palm_sprites.update(self.world_shift_x)
         self.fg_palm_sprites.draw(self.display_surface)
 
         # goal
-        self.goal.update(self.world_shift_x, self.world_shift_y)
+        self.goal.update(self.world_shift_x)
         self.goal.draw(self.display_surface)
 
         # coins
-        self.coin_sprites.update(self.world_shift_x, self.world_shift_y)
+        self.coin_sprites.update(self.world_shift_x)
         self.coin_sprites.draw(self.display_surface)
+
+        # treasure chest
+        self.treasure_sprite.update(self.world_shift_x)
+        self.treasure_sprite.draw(self.display_surface)
 
         self.is_player_alive()
         self.has_player_won()
 
+        self.check_bottle_collisions()
         self.check_coin_collisions()
+        self.check_boss_sight()
+        self.check_for_shell_sight()
+        self.check_pearl_collision()
         self.check_enemy_collisions()
 
         # water
-        self.water.draw(self.display_surface, self.world_shift_x, self.world_shift_y)
+        self.water.draw(self.display_surface, self.world_shift_x)
