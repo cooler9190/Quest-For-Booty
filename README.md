@@ -23,6 +23,11 @@ The game uses the keyboard for controls. Very simple platformer control scheme:
 'D' button - Move right
 'Spacebar' - Jump
 
+Choosing a level from the Overworld:
+'Left arrow key' - move select icon left
+'Right arrow key' - move select icon right
+'Spacebar' - select level 
+
 ## 5. Installation
 
 1. Clone the repository.
