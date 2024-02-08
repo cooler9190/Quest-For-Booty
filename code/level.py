@@ -1,3 +1,7 @@
+"""The level.py module contains the Level class,
+which is responsible for managing the game logic, rendering, and interactions within individual levels of the game.
+"""
+
 import pygame
 from support import import_csv_layout, import_cut_graphics
 from settings import tile_size, screen_height, screen_width
@@ -13,7 +17,18 @@ from game_data import levels
 
 
 class Level:
+    """The Level class represents an individual level in the game. It handles the setup,
+        updating, and rendering of various game elements such as terrain, player, enemies, collectibles, and more.
+
+        Parameters:
+                current_level: The current level number.
+                surface: The Pygame surface object representing the game window.
+                create_overworld: Callback function to create the overworld when transitioning between levels.
+                change_coins: Callback function to change the number of coins collected.
+                change_health: Callback function to change the player's health.
+    """
     def __init__(self, current_level, surface, create_overworld, change_coins, change_health):
+
         # general setup
         self.display_surface = surface
         self.world_shift_x = 0
@@ -110,6 +125,15 @@ class Level:
         self.clouds = Clouds(400, level_width, 30)
 
     def create_tile_group(self, layout, type):
+        """Creates a sprite group for a specific type of tile based on layout data, imported from the corresponding
+            .csv file in the level_data dictionary.
+
+            Parameters:
+                layout: Layout data parsed from CSV files.
+                type: Type of tile group to create (e.g., terrain, moving platform, crates).
+
+            Returns: Sprite group containing tiles of the specified type.
+        """
         sprite_group = pygame.sprite.Group()
 
         for row_index, row in enumerate(layout):
@@ -189,6 +213,12 @@ class Level:
         return sprite_group
 
     def player_setup(self, layout, change_health):
+        """ Sets up the player sprite based on layout data.
+
+            Parameters:
+                layout: Layout data parsed from CSV files.
+                change_health: Callback function to change the player's health.
+        """
         for row_index, row in enumerate(layout):
             for col_index, val in enumerate(row):
                 x = col_index * tile_size
@@ -202,18 +232,23 @@ class Level:
                     self.goal.add(sprite)
 
     def platform_collision_reverse(self):
-        # earthquake effect
-        # pygame.sprite.spritecollide(platform, self.moving_platform_sprites, False)
+        """This method handles reversing the movement direction of moving platforms
+            when they collide with invisible to the player constraint tiles.
+        """
         for platform in self.moving_platform_sprites:
             if pygame.sprite.spritecollide(platform, self.constraint_sprites, False):
                 platform.reverse()
 
     def enemy_collision_reverse(self):
+        """Handles reversing the movement direction of enemies
+            when they collide with invisible to the player constraint tiles.
+        """
         for enemy in self.enemy_sprites:
             if pygame.sprite.spritecollide(enemy, self.constraint_sprites, False):
                 enemy.reverse()
 
     def create_jump_particles(self, pos):
+        """Generates jump particles when the player jumps or lands, adding visual effects to enhance gameplay."""
         if self.player.sprite.facing_right:
             pos -= pygame.math.Vector2(10, 5)
         else:
@@ -231,6 +266,22 @@ class Level:
     # We will move the player and check for collisions here in the level class
     # because we need access to the tiles
     def horizontal_movement_collision(self):
+        """Handles horizontal movement collision detection for the player.
+            The method is called during each game update cycle and is responsible for ensuring
+            that the player sprite does not move through solid objects horizontally.
+            It adjusts the player's collision rectangle (collision_rect) based on its movement direction and speed.
+            It iterates over all collidable_sprites (terrain, crates, moving platforms, shells.)
+            to check for collisions with the player's collision rectangle using the colliderect method.
+
+            If a collision is detected:
+                If the player is moving left (direction.x < 0), it positions the player's collision rectangle
+                to the right of the collided object, setting the players on_left state to True
+                and prevents further movement left.
+
+                If the player is moving right (direction.x > 0), it positions the player's collision rectangle
+                to the left of the collided object, setting the players on_right state to True
+                and prevents further movement right.
+        """
         player = self.player.sprite
         player.collision_rect.x += player.direction.x * player.speed
         collidable_sprites = (self.terrain_sprites.sprites() + self.crate_sprites.sprites() +
@@ -250,6 +301,29 @@ class Level:
                     player.on_right = True
 
     def vertical_movement_collision(self):
+        """ Handles vertical movement collision detection for the player.
+            The method is called during each game update cycle and prevents the player sprite
+            from falling through solid objects (ground) and from passing through ceilings.
+            It adjusts the player's collision rectangle (collision_rect) based on its movement direction and speed.
+            It iterates hover all collidable_sprites (terrain, crates, moving platforms, shells)
+            to check for collisions with the player's collision rectangle using the colliderect method.
+
+            If a collision is detected:
+                If the player is moving downward (direction.y > 0), it positions the player's collision rectangle
+                above the collided object and sets the payers state on_ground to True,
+                preventing further downward movement.
+
+                If the player is moving upward (direction.y < 0), it positions the player's collision rectangle
+                below the collided object and sets the payers state on_ceiling to True,
+                preventing further upward movement.
+
+                It also handles special cases like landing on moving platforms,
+                by passing a reference to the exact moving platform with which a collision has occured,
+                to the players on_platform attribute.
+
+                If the players state on_ground is True and he is moving upward or downward
+                the players on_ground state must be reverted to False and his on_platform attribute set to Null.
+        """
         player = self.player.sprite
         player.apply_gravity()
         collidable_sprites = (self.terrain_sprites.sprites() + self.crate_sprites.sprites() +
@@ -276,6 +350,10 @@ class Level:
                 player.on_platform = None
 
     def scroll_x(self):
+        """Scrolls the game world horizontally based on player movement.
+            When the player reaches a certain portion of the screen, his movement speed is set to 0
+            and teh screen/camera starts shifting in the current direction at the same speed.
+        """
         player = self.player.sprite
         player_x = player.rect.centerx
         direction_x = player.direction.x
@@ -290,15 +368,20 @@ class Level:
             player.speed = 8
 
     def world_shift(self):
+        """Updates the world shift based on player movement."""
         self.scroll_x()
 
     def is_payer_on_ground(self):
+        """Sets the player status on_ground to True or False, depending on collision.
+            Important for the vertical_movement_collision and whether the gravity/falling will be applied to the palyer.
+        """
         if self.player.sprite.on_ground:
             self.player_on_ground = True
         else:
             self.player_on_ground = False
 
     def create_landing_dust(self):
+        """Creates dust particles upon landing."""
         if not self.player_on_ground and self.player.sprite.on_ground and not self.dust_sprite.sprites():
             if self.player.sprite.facing_right:
                 offset = pygame.math.Vector2(10, 15)
@@ -308,14 +391,17 @@ class Level:
             self.dust_sprite.add(fall_dust_particles)
 
     def is_player_alive(self):
+        """Checks if the player has fallen of the screen."""
         if self.player.sprite.rect.top > screen_height:
             self.create_overworld(self.current_level, 0)
 
     def has_player_won(self):
+        """Checks if the player has won the level and unlocks the next one."""
         if pygame.sprite.spritecollide(self.player.sprite, self.goal, False):
             self.create_overworld(self.current_level, self.new_max_level)
 
     def check_bottle_collisions(self):
+        """Checks for collisions between the player and health items and heals the player."""
         for bottle in self.health_sprites:
             if bottle.rect.colliderect(self.player.sprite.collision_rect):
                 bottle.kill()
@@ -323,6 +409,7 @@ class Level:
                 self.coin_sound.play()
 
     def check_coin_collisions(self):
+        """Checks for collisions between the player and coins and updates the current coin value."""
         for coin in self.coin_sprites:
             if coin.rect.colliderect(self.player.sprite.collision_rect):
                 coin.kill()
@@ -330,6 +417,10 @@ class Level:
                 self.coin_sound.play()
 
     def check_for_shell_sight(self):
+        """Checks if the player is within the sight range of shell enemies.
+            If the player is within this range (x and y respectively),
+            the shell enemy calls its shoot method and adds a pearl to the pearl_sprite group.
+        """
         for shell in self.shell_sprites:
             if shell.direction == 'left':
                 sight_range_start = shell.rect.x - 7 * tile_size
@@ -346,6 +437,10 @@ class Level:
                 shell.frames = shell.idle_frames
 
     def check_boss_sight(self):
+        """ Checks if the player is within sight range of the boss enemy.
+            If in range, the boss will move in the players direction, and if not in sight
+            the boss stops in the same place.
+        """
         player = self.player.sprite
         boss_sprites = self.boss_sprite.sprites()
 
@@ -362,12 +457,16 @@ class Level:
                 boss.stop()
 
     def check_pearl_collision(self):
+        """Checks for collisions between the player and pearls and player takes damage."""
         for pearl in self.pearl_sprite:
             if pearl.rect.colliderect(self.player.sprite.collision_rect):
                 pearl.has_hit = True
                 self.player.sprite.get_damage(-10)
 
     def check_spike_collision(self):
+        """Checks for collisions between the player, boss and spikes.
+            Both the boss and player take damage from the spikes.
+        """
         boss_sprites = self.boss_sprite.sprites()
         for spikes in self.spike_sprites:
             if spikes.rect.colliderect(self.player.sprite.collision_rect):
@@ -384,12 +483,18 @@ class Level:
                         boss.kill()
                         self.change_coins(500)
 
-
-
     def check_enemy_collisions(self):
         # to achieve this we will check if the bottom of the player is in the top half of the enemy
         # and the player is going down, we know we are destroying the enemy
         # but if player has collided in any different way, he will take damage
+
+        """ Checks for collisions between the player and enemies/boss.
+            Depending on the te collision, the player will kill the enemy of his bottom collides
+            with the top of the enemy sprite. Any other collision will result in the player taking damage.
+
+            The boss cannot be killed by the player directly, so any type of collision with him,
+            will result in the player taking damage equal to one third of his total health.
+        """
         enemy_collisions = pygame.sprite.spritecollide(self.player.sprite, self.enemy_sprites, False)
         boss_collision = pygame.sprite.spritecollide(self.player.sprite, self.boss_sprite, False)
 
@@ -413,7 +518,9 @@ class Level:
             self.player.sprite.direction.y = -15
 
     def run(self):
-        # run the entire game/level
+        """ Runs the entire level, including updating and rendering game elements,
+            handling interactions, and triggering events.
+        """
 
         # sky
         self.sky.draw(self.display_surface)

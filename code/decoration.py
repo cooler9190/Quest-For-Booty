@@ -1,3 +1,5 @@
+"""This module defines classes representing background decorations such as sky, water, and clouds."""
+
 import pygame
 from settings import vertical_tile_number, tile_size, screen_width
 from tiles import AnimatedTile, StaticTile
@@ -6,7 +8,24 @@ from random import choice, randint
 
 
 class Sky:
+    """Represents the sky background decoration.
+
+        Attributes:
+            top: Surface representing the top portion of the sky.
+            bottom: Surface representing the bottom portion of the sky.
+            middle: Surface representing the middle portion of the sky.
+            horizon: Y-coordinate of the horizon.
+            style: Style of the sky ('level' or 'overworld').
+            palms: List of palm tree surfaces and their rectangles.
+            clouds: List of cloud surfaces and their rectangles.
+    """
     def __init__(self, horizon, style='level'):
+        """ Initializes a Sky object with a specified horizon and style.
+
+            Parameters:
+                horizon: Y-coordinate of the horizon.
+                style (optional): Style of the sky ('level' or 'overworld'). Defaults to 'level'.
+        """
         self.top = pygame.image.load('../graphics/decoration/sky/sky_top.png').convert()
         self.bottom = pygame.image.load('../graphics/decoration/sky/sky_bottom.png').convert()
         self.middle = pygame.image.load('../graphics/decoration/sky/sky_middle.png').convert()
@@ -39,6 +58,11 @@ class Sky:
                 self.clouds.append((surface, rect))
 
     def draw(self, surface):
+        """ Draws the sky decorations on the specified surface.
+
+            Parameters:
+                surface: Surface to draw the decorations on.
+        """
         for row in range(vertical_tile_number):
             y = row * tile_size
             if row < self.horizon:
@@ -57,7 +81,18 @@ class Sky:
 
 
 class Water:
+    """Represents the water background decoration.
+
+        Attributes:
+            water_sprites: Sprite group containing water tiles.
+    """
     def __init__(self, top, level_width):
+        """ Initializes a Water object with water tiles.
+
+            Parameters:
+                top: Y-coordinate of the top of the water.
+                level_width: Width of the level.
+        """
         water_start = -screen_width
         water_tile_width = 192
         num_of_tiles = int((level_width + screen_width) / water_tile_width)
@@ -70,12 +105,30 @@ class Water:
             self.water_sprites.add(sprite)
 
     def draw(self, surface, shift_x):
+        """Draws the water tiles on the specified surface.
+
+            Parameters:
+                surface: Surface to draw the water tiles on.
+                shift_x: Horizontal shift amount.
+        """
         self.water_sprites.draw(surface)
         self.water_sprites.update(shift_x)
 
 
 class Clouds:
+    """Represents the clouds background decoration.
+
+        Attributes:
+            cloud_sprites: Sprite group containing cloud tiles.
+    """
     def __init__(self, horizon, level_width, cloud_number):
+        """Initializes a Clouds object with cloud tiles.
+
+            Parameters:
+                horizon: Y-coordinate of the horizon.
+                level_width: Width of the level.
+                cloud_number: Number of cloud tiles to generate.
+        """
         cloud_surf_list = import_folder('../graphics/decoration/clouds')
         min_x = -screen_width
         max_x = level_width + screen_width
@@ -91,5 +144,11 @@ class Clouds:
             self.cloud_sprites.add(sprite)
 
     def draw(self, surface, shift_x):
+        """ Draws the cloud tiles on the specified surface.
+
+            Parameters:
+                surface: Surface to draw the cloud tiles on.
+                shift_x: Horizontal shift amount.
+        """
         self.cloud_sprites.draw(surface)
         self.cloud_sprites.update(shift_x)
